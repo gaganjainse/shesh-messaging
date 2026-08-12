@@ -5,10 +5,8 @@ from __future__ import annotations
 import os
 import pathlib
 
-try:
-    from shesh_audit.mcp_guard import GuardedMCP as FastMCP
-except ImportError:
-    from fastmcp import FastMCP
+from shesh_audit.mcp_guard import GuardedMCP as FastMCP
+from shesh_secrets import resolve as _resolve_secret
 
 mcp = FastMCP("shesh-messaging")
 
@@ -28,19 +26,14 @@ def list_bridges() -> dict:
     }
 
 def _get_token() -> str | None:
-    """TELEGRAM_BOT_TOKEN via shesh-secrets, else plain environment."""
-    try:
-        from shesh_secrets import get_secret  # type: ignore
+    """TELEGRAM_BOT_TOKEN resolved via a shesh-secrets reference.
 
-        try:
-            token = get_secret("env:TELEGRAM_BOT_TOKEN")
-            if token:
-                return token
-        except (OSError, KeyError, RuntimeError):
-            pass
-    except ImportError:
-        pass
-    return os.environ.get("TELEGRAM_BOT_TOKEN")
+    Defaults to env:TELEGRAM_BOT_TOKEN; set SHESH_TELEGRAM_TOKEN_REF to any
+    shesh-secrets reference (env:/gopass:/keepassxc:/file:) to source the
+    token from an external secret store instead.
+    """
+    return _resolve_secret(os.environ.get("SHESH_TELEGRAM_TOKEN_REF",
+                                          "env:TELEGRAM_BOT_TOKEN"))
 
 
 def _telegram_api(token: str, method: str, payload: dict, timeout: int = 10) -> dict:
@@ -116,18 +109,12 @@ def send_signal(recipient: str, message: str) -> dict:
 
 
 def _get_signal_account() -> str | None:
-    try:
-        from shesh_secrets import get_secret  # type: ignore
+    """SIGNAL_ACCOUNT resolved via a shesh-secrets reference.
 
-        try:
-            account = get_secret("env:SIGNAL_ACCOUNT")
-            if account:
-                return account
-        except (OSError, KeyError, RuntimeError):
-            pass
-    except ImportError:
-        pass
-    return os.environ.get("SIGNAL_ACCOUNT")
+    Defaults to env:SIGNAL_ACCOUNT; override with SHESH_SIGNAL_ACCOUNT_REF.
+    """
+    return _resolve_secret(os.environ.get("SHESH_SIGNAL_ACCOUNT_REF",
+                                          "env:SIGNAL_ACCOUNT"))
 
 @mcp.tool()
 def enable_bridge(bridge: str) -> dict:
