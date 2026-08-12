@@ -18,3 +18,8 @@ Security: bridges refuse to send secrets, protected paths, and require explicit 
 ```bash
 uv sync && uv run pytest
 ```
+
+## Security
+
+Security posture and vulnerability reporting: [canonical ecosystem security
+policy](https://github.com/gaganjainse/shesh-ecosystem/blob/main/SECURITY.md).
