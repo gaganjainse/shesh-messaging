@@ -65,7 +65,7 @@ def test_send_telegram_api_error(monkeypatch, tmp_path):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "TESTTOKEN")
 
     def boom(req, timeout=0):
-        raise TimeoutError("no network")
+        raise TimeoutError
 
     monkeypatch.setattr("urllib.request.urlopen", boom)
     res = srv.send_telegram("123", "hello")

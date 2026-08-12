@@ -36,6 +36,25 @@ def _get_token() -> str | None:
                                           "env:TELEGRAM_BOT_TOKEN"))
 
 
+class TelegramError(RuntimeError):
+    """Base for Telegram Bot API failures."""
+
+
+class TelegramAPIError(TelegramError):
+    """The Bot API answered with an HTTP error."""
+
+    def __init__(self, code: int, detail: str) -> None:
+        self.code = code
+        super().__init__(f"telegram HTTP {code}: {detail}")
+
+
+class TelegramRequestError(TelegramError):
+    """The Bot API could not be reached or its reply was unreadable."""
+
+    def __init__(self, cause: BaseException) -> None:
+        super().__init__(f"telegram request failed: {cause}")
+
+
 def _telegram_api(token: str, method: str, payload: dict, timeout: int = 10) -> dict:
     """Call the Telegram Bot API. The token only ever lives in the URL path
     of an in-memory request — never in logs, errors, or the return value."""
@@ -52,10 +71,13 @@ def _telegram_api(token: str, method: str, payload: dict, timeout: int = 10) -> 
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")[:200]
-        raise RuntimeError(f"telegram HTTP {exc.code}: {detail}") from exc
+        # with-statement: an HTTPError is a live socket — close it even if the
+        # error body cannot be read (see the same leak fixed in shesh-health).
+        with exc as e:
+            detail = e.read().decode(errors="replace")[:200]
+        raise TelegramAPIError(exc.code, detail) from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"telegram request failed: {exc}") from exc
+        raise TelegramRequestError(exc) from exc
 
 
 @mcp.tool()
@@ -71,7 +93,7 @@ def send_telegram(chat_id: str, message: str) -> dict:
         return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not found (shesh-secrets env:TELEGRAM_BOT_TOKEN or environment)"}
     try:
         resp = _telegram_api(token, "sendMessage", {"chat_id": chat_id, "text": message})
-    except RuntimeError as exc:
+    except TelegramError as exc:
         return {"ok": False, "error": str(exc)}
     result = resp.get("result", {})
     return {
