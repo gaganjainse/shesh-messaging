@@ -6,9 +6,9 @@ import os
 import pathlib
 
 try:
-    from shesh_audit.guard import GuardedMCP as FastMCP
+    from shesh_audit.mcp_guard import GuardedMCP as FastMCP
 except ImportError:
-    from mcp.server.fastmcp import FastMCP
+    from fastmcp import FastMCP
 
 mcp = FastMCP("shesh-messaging")
 
