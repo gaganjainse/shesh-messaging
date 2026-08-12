@@ -105,6 +105,65 @@ def send_telegram(chat_id: str, message: str) -> dict:
 
 
 @mcp.tool()
+def read_telegram(offset: int = 0, limit: int = 20, timeout: int = 0) -> dict:
+    """Read incoming Telegram updates via getUpdates (a send-only bridge is
+    half a bridge — this completes the loop).
+
+    Callers track the offset themselves: pass max(update_id)+1 from the last
+    batch to acknowledge. timeout>0 long-polls. Token handling is identical
+    to send_telegram: in-memory only, never logged.
+    """
+    if not _is_enabled("telegram"):
+        return {"ok": False, "error": "telegram bridge not enabled — create ~/.config/shesh/messaging/telegram.enabled"}
+    token = _get_token()
+    if not token:
+        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not found (shesh-secrets env:TELEGRAM_BOT_TOKEN or environment)"}
+    limit = max(1, min(int(limit), 100))
+    timeout = max(0, min(int(timeout), 60))
+    try:
+        resp = _telegram_api(token, "getUpdates",
+                             {"offset": int(offset), "limit": limit, "timeout": timeout},
+                             timeout=timeout + 10)
+    except TelegramError as exc:
+        return {"ok": False, "error": str(exc)}
+    messages = []
+    for upd in resp.get("result", []):
+        msg = upd.get("message") or upd.get("channel_post") or {}
+        messages.append({
+            "update_id": upd.get("update_id"),
+            "chat_id": (msg.get("chat") or {}).get("id"),
+            "from": (msg.get("from") or {}).get("username"),
+            "text": msg.get("text", ""),
+            "date": msg.get("date"),
+        })
+    next_offset = max((m["update_id"] for m in messages), default=None)
+    return {
+        "ok": bool(resp.get("ok")),
+        "count": len(messages),
+        "messages": messages,
+        "next_offset": (next_offset + 1) if next_offset is not None else int(offset),
+    }
+
+
+@mcp.tool()
+def telegram_status() -> dict:
+    """Connectivity + identity probe via getMe. Answers 'is the token valid
+    and the API reachable' without exposing anything secret."""
+    if not _is_enabled("telegram"):
+        return {"ok": False, "error": "telegram bridge not enabled"}
+    token = _get_token()
+    if not token:
+        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN not found"}
+    try:
+        resp = _telegram_api(token, "getMe", {})
+    except TelegramError as exc:
+        return {"ok": False, "error": str(exc)}
+    me = resp.get("result", {})
+    return {"ok": bool(resp.get("ok")), "bot_id": me.get("id"),
+            "username": me.get("username"), "can_read": me.get("can_read_all_group_messages", False)}
+
+
+@mcp.tool()
 def send_signal(recipient: str, message: str) -> dict:
     """Send a real Signal message via signal-cli (must be installed+registered)."""
     if not _is_enabled("signal"):
