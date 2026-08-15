@@ -1,29 +1,35 @@
->  **Consolidated into [shesh-core](https://github.com/gaganjainse/shesh-core)** — this module now lives in the shesh-core monorepo (same package name, same console script). Archived 2026-08-13.
-
 # shesh-messaging
 
-Messaging bridges — Telegram/Signal as isolated opt-in services.
+> **Superseded by [shesh-core](https://github.com/gaganjainse/shesh-core).**
+> This repository is a tombstone: its history is preserved, its source is not.
 
-- Part of [Shesh ecosystem](https://github.com/gaganjainse/shesh-ecosystem)
-- Layer: Soma (body)
-- Provides: telegram-bridge, signal-bridge
-- Isolated: each bridge runs as separate systemd user service with its own account, opt-in, not enabled by default
+## What happened
 
-## Tools
+[ADR-0019](https://github.com/gaganjainse/shesh-docs/blob/main/src/governance/adr/0019-shesh-core-monorepo.md)
+consolidated the single-module services into one repository. A module of a few
+hundred lines is not a service: each one carried its own build configuration,
+pipeline, and security policy, and those drifted apart from each other.
 
-- `send_telegram` — send message via Telegram Bot API (needs TELEGRAM_BOT_TOKEN via shesh-secrets)
-- `send_signal` — send via signal-cli (needs SIGNAL account)
-- `list_bridges` — list enabled bridges
+The code now lives in `shesh-core` as the `shesh_messaging` package, with
+the same import path and the same console script.
 
-Security: bridges refuse to send secrets, protected paths, and require explicit opt-in `~/.config/shesh/messaging/{telegram,signal}.enabled` + token via shesh-secrets.
+## Why the source was removed
 
-## Dev
+Two copies of the same module drift. Keeping the code here meant a reader could
+find it, edit it, and have the change silently ignored by everything that
+actually runs.
+
+The history remains in this repository's git log. Nothing was lost.
+
+## Installing
 
 ```bash
-uv sync && uv run pytest
+pipx install git+https://github.com/gaganjainse/shesh-core.git
 ```
 
-## Security
+Console script names are unchanged, so existing client configuration keeps
+working.
 
-Security posture and vulnerability reporting: [canonical ecosystem security
-policy](https://github.com/gaganjainse/shesh-ecosystem/blob/main/SECURITY.md).
+## Licence
+
+GPL-3.0-or-later.
